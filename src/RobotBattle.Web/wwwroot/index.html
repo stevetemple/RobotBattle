@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Battle</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+<header>
+  <h1>Robot Battle</h1>
+  <nav><a href="docs.html" target="_blank" rel="noopener">How to play &amp; API docs</a></nav>
+  <div id="who" class="actions" hidden>
+    <span>Signed in as <strong id="whoName"></strong></span>
+    <button id="logout">Sign out</button>
+  </div>
+</header>
+
+<section id="login" class="card narrow" hidden>
+  <h2>Enter the arena</h2>
+  <form id="loginForm">
+    <label>Your name <input id="loginName" maxlength="24" required autocomplete="nickname"></label>
+    <button>Join</button>
+  </form>
+  <p id="loginError" class="error" role="alert"></p>
+</section>
+
+<div id="app" hidden>
+<main>
+  <div class="stage">
+    <canvas id="arena" width="800" height="600"></canvas>
+    <div id="result" class="result" hidden></div>
+    <div id="placeholder" class="placeholder">Pick robots and press Fight, or watch a past battle.</div>
+    <div id="rounds" class="rounds" hidden></div>
+    <div id="match" class="match" hidden></div>
+  </div>
+  <aside>
+    <h2>In this battle</h2>
+    <ul id="roster"></ul>
+    <label class="check"><input id="showScan" type="checkbox" checked> Show scan arcs</label>
+
+    <h2>Robots</h2>
+    <ul id="robots" class="pick"></ul>
+    <div class="row">
+      <label>Rounds
+        <select id="roundCount">
+          <option>1</option><option>3</option><option selected>5</option><option>7</option><option>10</option>
+        </select>
+      </label>
+      <button id="fight">Fight!</button>
+      <button id="demo" class="secondary">Demo battle</button>
+    </div>
+    <p id="fightStatus" class="muted" role="status"></p>
+
+    <h2>Recent battles</h2>
+    <ul id="battles" class="pick"></ul>
+  </aside>
+</main>
+
+<section class="card leaderboard">
+  <h2>Leaderboard</h2>
+  <table>
+    <thead><tr><th>#</th><th>Robot</th><th>Owner</th><th title="Elo-style rating, starts at 1000">Rating</th><th title="Rounds won, drawn, lost">Rounds W–D–L</th><th title="Battles won out of battles fought">Battles won</th></tr></thead>
+    <tbody id="leaderboardBody"></tbody>
+  </table>
+  <p class="muted">Every battle is several rounds. Each round ranks the robots, and ratings move for every pair: beating a stronger robot is worth more than beating a weaker one.</p>
+</section>
+
+<section class="card editor">
+  <h2>Your robot</h2>
+  <div class="row">
+    <label>Robot name <input id="label" maxlength="24" placeholder="Robo 1"></label>
+    <label>Load a sample <select id="samples"><option value="">Choose…</option></select></label>
+    <button id="upload">Compile &amp; upload</button>
+  </div>
+  <textarea id="source" spellcheck="false" aria-label="Robot C# source" rows="22"></textarea>
+  <pre id="diagnostics" class="diag" role="status"></pre>
+</section>
+
+<footer>
+  <button id="play" aria-label="Play or pause">Pause</button>
+  <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Timeline">
+  <span id="tickLabel">0 / 0</span>
+  <label>Speed
+    <select id="speed">
+      <option value="0.5">0.5x</option>
+      <option value="1" selected>1x</option>
+      <option value="2">2x</option>
+      <option value="4">4x</option>
+      <option value="8">8x</option>
+    </select>
+  </label>
+</footer>
+</div>
+<script src="viewer.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

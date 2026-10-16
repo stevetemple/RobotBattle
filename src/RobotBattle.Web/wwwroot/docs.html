@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Battle Docs</title>
+<link rel="stylesheet" href="viewer.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header>
+  <h1>Robot Battle: how to play</h1>
+  <nav><a href="index.html">Back to the arena</a></nav>
+</header>
+
+<div class="docs">
+<nav class="toc" aria-label="Contents">
+  <ol>
+    <li><a href="#quickstart">Quick start</a></li>
+    <li><a href="#arena">The arena</a></li>
+    <li><a href="#state">Reading your state</a></li>
+    <li><a href="#actions">Actions</a></li>
+    <li><a href="#scanning">Scanning</a></li>
+    <li><a href="#shooting">Shooting and damage</a></li>
+    <li><a href="#energy">Health and energy</a></li>
+    <li><a href="#winning">Rounds and the leaderboard</a></li>
+    <li><a href="#limits">Limits and what is allowed</a></li>
+    <li><a href="#samples">Sample robots</a></li>
+    <li><a href="#tips">Tips</a></li>
+  </ol>
+</nav>
+
+<article>
+
+<section id="quickstart">
+<h2>Quick start</h2>
+<p>You write one C# class. Every tick of the battle (30 per second, at most 5000 ticks) the arena calls your <code>Tick</code> method. Look at your state, queue some actions, and return. That is the whole interface.</p>
+<pre><code>using System;
+using System.Linq;
+using RobotBattle.Api;
+
+public class MyRobot : Robot
+{
+    public override string Name =&gt; "My Robot";
+
+    public override void Tick(RobotState s, Actions a)
+    {
+        a.Move(2);                 // drive forwards
+        a.Turn(3);                 // ...turning gently
+        a.Scan(s.TurretHeading, 40);   // look along the gun
+
+        var enemy = s.LastScan?.Hits.FirstOrDefault(h =&gt; h.Type == HitType.Robot);
+        if (enemy != null)
+            a.Shoot(enemy.Distance, 1);
+    }
+}</code></pre>
+<ol>
+  <li>Sign in with a name, then write or load a sample in the editor.</li>
+  <li>Give it a name and press <strong>Compile &amp; upload</strong>. Errors show with line numbers.</li>
+  <li>Tick two or more robots in the list (yours or anyone else's), choose how many rounds, and press <strong>Fight!</strong>.</li>
+  <li>Watch the replay round by round (rounds play one after another, or click a round number). You can pause, scrub and change speed, and show or hide scan arcs. Your robot's rating shows on the leaderboard.</li>
+</ol>
+<p>Your class must be <code>public</code>, derive from <code>Robot</code> and have a public parameterless constructor. Only one such class per submission, but you can add as many helper classes as you like. A fresh instance is created for every battle, so fields keep their values across ticks and reset between battles.</p>
+</section>
+
+<section id="arena">
+<h2>The arena</h2>
+<ul>
+  <li>The arena is <strong>800 &times; 600</strong> units. <code>(0, 0)</code> is the top-left corner; <strong>x grows to the right and y grows downwards</strong>.</li>
+  <li><strong>Angles are in degrees.</strong> 0 is east (right), 90 is south (down), 180 is west, 270 is north. Angles increase clockwise as you see them on screen. Bearings and headings are absolute angles in the arena; nothing is relative to your robot.</li>
+  <li>Robots are discs of radius 18. Five round obstacles (radius 20&ndash;40) are scattered about at random. Robots and obstacles are solid.</li>
+  <li>Robots start at random positions, at least 150 apart where there is room, with a random heading and the turret pointing the same way.</li>
+  <li>You know the arena size (<code>ArenaWidth</code>, <code>ArenaHeight</code>) and where <em>you</em> are. You do <strong>not</strong> know where the enemies or the obstacles are until you scan.</li>
+  <li>Battles are deterministic given a seed, apart from anything your own code does with <code>System.Random</code>.</li>
+</ul>
+</section>
+
+<section id="state">
+<h2>Reading your state</h2>
+<p><code>Tick(RobotState s, Actions a)</code> gets a fresh <code>RobotState</code> every tick.</p>
+<table>
+  <thead><tr><th>Property</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>Tick</code></td><td>Tick number, starting at 0.</td></tr>
+    <tr><td><code>ArenaWidth</code>, <code>ArenaHeight</code></td><td>Size of the arena.</td></tr>
+    <tr><td><code>X</code>, <code>Y</code></td><td>Your position (centre of the robot).</td></tr>
+    <tr><td><code>Health</code></td><td>Your remaining health. Explosions reduce it; at 0 you are destroyed. See <a href="#energy">Health and energy</a>.</td></tr>
+    <tr><td><code>Energy</code></td><td>Your remaining energy, spent by actions. Running out does not destroy you, but you cannot act until you recharge.</td></tr>
+    <tr><td><code>Heading</code></td><td>The direction your body faces, in degrees (0&ndash;360).</td></tr>
+    <tr><td><code>TurretHeading</code></td><td>The direction your gun points, in degrees (0&ndash;360). Bullets leave in this direction.</td></tr>
+    <tr><td><code>Speed</code></td><td>Your current speed in units per tick (negative when reversing).</td></tr>
+    <tr><td><code>LastScan</code></td><td>The result of the scan you requested <em>last tick</em>, or <code>null</code> if you did not request one (or could not afford it).</td></tr>
+    <tr><td><code>DamageTaken</code></td><td>Health lost to explosions since your previous tick.</td></tr>
+    <tr><td><code>HitWall</code></td><td>True if you were blocked last tick: you ran into the arena edge, an obstacle or another robot.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="actions">
+<h2>Actions</h2>
+<p>Call these on the <code>Actions</code> object. A tick starts with nothing queued. If you call the same action twice in one tick, the last call wins. Values outside the limits are silently clamped; <code>NaN</code> is ignored.</p>
+<table>
+  <thead><tr><th>Call</th><th>What it does</th><th>Limit</th></tr></thead>
+  <tbody>
+    <tr><td><code>Move(speed)</code></td><td>Sets your speed. Positive is forwards, negative is backwards. <strong>The speed stays set</strong> until you change it, so you do not need to call it every tick. Hitting something stops you (speed becomes 0).</td><td>&minus;4 to +4 units per tick</td></tr>
+    <tr><td><code>Turn(degrees)</code></td><td>Turns the body by this many degrees this tick. Positive is clockwise. Not persistent.</td><td>&plusmn;8&deg; per tick</td></tr>
+    <tr><td><code>TurnTurret(degrees)</code></td><td>Turns the gun by this many degrees this tick, independently of the body. Not persistent.</td><td>&plusmn;12&deg; per tick</td></tr>
+    <tr><td><code>Shoot(distance, power)</code></td><td>Fires a bullet that explodes <code>distance</code> units from your centre, in the direction the turret points. Power defaults to 1.</td><td>distance 1&ndash;600, power 0.1&ndash;3, one shot every 10 ticks</td></tr>
+    <tr><td><code>Scan(direction, arc)</code></td><td>Looks in an arc centred on the absolute angle <code>direction</code>, <code>arc</code> degrees wide. Results arrive next tick in <code>LastScan</code>. The scan direction is independent of the turret.</td><td>arc 0&ndash;60&deg;</td></tr>
+    <tr><td><code>Recharge()</code></td><td>Spends the whole tick idle to regain energy. You stop moving and every other action queued this tick is ignored. The gun still cools down.</td><td>+1% of starting energy per tick, never above the starting energy</td></tr>
+  </tbody>
+</table>
+<p>Within a tick, actions are applied in this order: body turn, turret turn, move, scan, shoot. Each costs energy; if you cannot afford one it is skipped.</p>
+<p>The shortest way to turn from one angle to another is <code>Math.IEEERemainder(target - current, 360)</code>, which returns a value between &minus;180 and 180. Pass that straight to <code>Turn</code> or <code>TurnTurret</code> and the engine clamps it for you.</p>
+</section>
+
+<section id="scanning">
+<h2>Scanning</h2>
+<p>A scan covers an arc anywhere in the arena (range 1000, longer than the arena diagonal). Anything whose body overlaps the arc is reported, sorted nearest first. A scan is a request, and the answer comes <strong>next tick</strong>, describing what was there when you asked.</p>
+<pre><code>foreach (var hit in s.LastScan?.Hits ?? Enumerable.Empty&lt;ScanHit&gt;())
+{
+    // hit.Type      HitType.Robot or HitType.Obstacle
+    // hit.Bearing   absolute angle from you to its centre, degrees
+    // hit.Distance  distance from you to its centre
+    // hit.Radius    its size (robots are 18; obstacles 20-40)
+}</code></pre>
+<ul>
+  <li>A narrow arc costs less energy than a wide one, and tells you more precisely where a robot is. A 60&deg; scan covers a sixth of the arena.</li>
+  <li><strong>Scans see through obstacles</strong>, but bullets do not pass through them. Use <code>Radius</code> to check whether an obstacle is on your line of fire before you waste a shot. See the <code>Blocked</code> helper in the Hunter sample.</li>
+  <li>The arena does not remember anything for you: if you stop scanning a robot, you no longer know where it is. Store what you saw in fields.</li>
+  <li>A scan tells you where a robot <em>was</em>. To hit a moving robot, estimate its velocity from two sightings and aim ahead (see the Sniper sample).</li>
+</ul>
+</section>
+
+<section id="shooting">
+<h2>Shooting and damage</h2>
+<ul>
+  <li>The bullet starts 18 units in front of you along the turret direction and flies at 12 units per tick. It <strong>explodes at exactly the distance you asked for</strong>, whether or not anything is there. You choose where the blast happens.</li>
+  <li>Bullets pass over robots. Damage comes only from the explosion.</li>
+  <li>Bullets explode early if they hit an obstacle or the arena edge.</li>
+  <li>Every robot within <strong>60 units</strong> of the explosion centre takes damage, <strong>including you</strong>:
+    <pre><code>damage = power &times; 10 &times; (1 &minus; distanceFromBlast / 60)</code></pre>
+    A dead-centre hit at power 3 does 30. A hit 30 units off-centre does half that. Touching the edge of the blast does nothing.</li>
+  <li>Damage lands at the end of the tick the bullet explodes, and shows up in <code>DamageTaken</code> on the victim's next tick.</li>
+  <li>After firing, the gun needs 10 ticks to cool down. A <code>Shoot</code> during the cooldown is ignored and costs nothing.</li>
+</ul>
+</section>
+
+<section id="energy">
+<h2>Health and energy</h2>
+<p>Every robot starts with <strong>100 health</strong> and <strong>100 energy</strong>. Explosions reduce health; <strong>at 0 health you are destroyed.</strong> Health never regenerates. Actions spend energy and nothing else. <strong>Running out of energy does not destroy you</strong>, but you cannot afford any action until you <code>Recharge()</code>, which restores only 1 energy per tick.</p>
+<table>
+  <thead><tr><th>Action</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td>Move</td><td>0.01 &times; |speed| every tick (full speed: 0.04 per tick)</td></tr>
+    <tr><td>Turn body</td><td>0.01 per degree</td></tr>
+    <tr><td>Turn turret</td><td>0.005 per degree</td></tr>
+    <tr><td>Scan</td><td>0.001 per degree of arc (a 60&deg; scan: 0.06)</td></tr>
+    <tr><td>Shoot</td><td>1 &times; power + 0.002 &times; distance (power 2 at 300 units: 2.6)</td></tr>
+    <tr><td>Collision</td><td>0.5 each time you are blocked by an edge, obstacle or robot</td></tr>
+  </tbody>
+</table>
+<p>Standing still costs nothing, but scanning every tick for a whole 5000-tick battle at 60&deg; would cost 300, which is more than you have. Be economical: scan narrow once you have found a target, and stay quiet when there is nothing to do.</p>
+</section>
+
+<section id="winning">
+<h2>Rounds, winning and the leaderboard</h2>
+<p>A battle is a <strong>match of several rounds</strong> (5 by default; the person starting the battle can choose 1 to 10). Every round has a new random arena layout and starting positions, and every robot starts it fresh: new instance, 100 health, 100 energy, nothing remembered from the last round.</p>
+<h3>Winning a round</h3>
+<ul>
+  <li>The last robot still alive wins the round. Robots are ranked by how long they survived, so with several robots you still get 1st, 2nd, 3rd and so on.</li>
+  <li>Robots destroyed on the same tick share a place.</li>
+  <li>If 5000 ticks pass with more than one robot alive, the survivors are ranked by <strong>health</strong>; equal health shares the place.</li>
+</ul>
+<h3>Winning the match</h3>
+<p>Each round gives every robot a score from 0 to 1: its average result against each other robot (win = 1, tie = 0.5, loss = 0). In a two-robot match that is simply 1, 0.5 or 0 per round. Scores add up over the rounds, and the robot with the most points wins the match. Equal points is a draw. A battle can have between 2 and 6 robots.</p>
+<h3>The leaderboard</h3>
+<p>Every robot that has fought is ranked by an <strong>Elo-style rating</strong>. New robots start at <strong>1000</strong>.</p>
+<ul>
+  <li>Each round, every pair of robots counts as one game, so ratings move for beating (or losing to) each opponent individually.</li>
+  <li>Beating a higher-rated robot earns more than beating a lower-rated one, and losing to a weaker robot costs more. Farming wins against a Sitting Duck soon stops paying.</li>
+  <li>The columns show rounds won, drawn and lost, and battles (matches) won out of battles fought.</li>
+  <li>Uploading a robot creates a new entry that starts again at 1000, so improving a robot means uploading it again under a new name. Delete the old one if you want it off the board.</li>
+</ul>
+</section>
+
+<section id="limits">
+<h2>Limits and what is allowed</h2>
+<h3>Your code is run in a sandbox</h3>
+<p>Each robot runs in its own locked-down container with no network, no files, a hard memory limit of 192 MB and limited CPU. It cannot see other robots or other players' code.</p>
+<ul>
+  <li><strong>Time:</strong> your <code>Tick</code> must return within about 200 ms (the very first tick gets longer for start-up). If it takes longer, or crashes the process, <strong>you are disqualified</strong>. Keep each tick quick.</li>
+  <li><strong>Memory:</strong> running out of memory disqualifies you.</li>
+  <li><strong>Exceptions:</strong> if <code>Tick</code> throws, you lose that tick's actions. Thirty in a row and you are disqualified.</li>
+  <li><strong>Overflow checking is on:</strong> integer arithmetic that overflows throws instead of wrapping. Floating point (<code>double</code>) does not.</li>
+</ul>
+<h3>Allowed</h3>
+<p>The namespaces <code>System</code>, <code>System.Collections</code>, <code>System.Collections.Generic</code>, <code>System.Linq</code>, <code>System.Text</code> and <code>RobotBattle.Api</code>. That includes <code>Math</code>, <code>List&lt;T&gt;</code>, <code>Dictionary&lt;K,V&gt;</code>, <code>StringBuilder</code> and <code>Random</code>.</p>
+<h3>Not allowed</h3>
+<p>Anything else is rejected at upload with a message pointing at the offending line, including: files and networking (<code>System.IO</code>, <code>System.Net</code>), threads and tasks, reflection, <code>Console</code>, <code>Environment</code>, <code>Process</code>, <code>Type</code>/<code>GetType()</code>, <code>Activator</code>, <code>GC</code>, <code>DateTime</code>, interop/P/Invoke, and <code>unsafe</code> code.</p>
+<h3>Submission limits</h3>
+<ul>
+  <li>Source up to 64 KB; at most 20 robots per player.</li>
+  <li>One public <code>Robot</code> subclass per submission.</li>
+  <li>Robot names are 2&ndash;24 letters, numbers, spaces, <code>_ . -</code>.</li>
+</ul>
+</section>
+
+<section id="samples">
+<h2>Sample robots</h2>
+<p>Use <strong>Load a sample</strong> in the editor to start from one of these. They are well commented.</p>
+<table>
+  <thead><tr><th>Sample</th><th>What it shows</th></tr></thead>
+  <tbody>
+    <tr><td>Sitting Duck</td><td>The minimum valid robot. It does nothing: a handy practice target.</td></tr>
+    <tr><td>Spinner</td><td>The crudest useful robot: circle, spin the turret, fire when something is seen. Does not aim, so it is easy to beat.</td></tr>
+    <tr><td>Hunter</td><td>The starter code. Sweep to find an enemy, aim the turret, fire when lined up, check line of sight and sidestep if blocked.</td></tr>
+    <tr><td>Sentry</td><td>Holds position and remembers its target between ticks. Only moves when an obstacle blocks its shot.</td></tr>
+    <tr><td>Dodger</td><td>Strafes sideways so bullets miss, using <code>HitWall</code> and <code>DamageTaken</code> to change direction.</td></tr>
+    <tr><td>Sniper</td><td>Estimates the enemy's velocity from two sightings and leads its shots.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="tips">
+<h2>Tips</h2>
+<ul>
+  <li>Start with Hunter. Beat it, then beat Dodger.</li>
+  <li>Keep your own state in fields. Last tick's scan is the only memory the arena gives you.</li>
+  <li>Do not shoot at point-blank range. The blast is 60 units wide and hurts you too.</li>
+  <li>An explosion needs to land near the enemy, not on it. Aim for where the robot <em>will</em> be.</li>
+  <li>Watch your energy. Hitting walls, scanning wide forever and spraying shots all drain it, and you cannot act at 0 energy, and the robot with the most health wins a stalemate.</li>
+  <li>Replays show your robot's scan arcs. Switch them on to see what your robot is actually looking at.</li>
+</ul>
+</section>
+
+</article>
+</div>
+</body>
+</html>

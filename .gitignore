@@ -1,0 +1,41 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.tgz
+
+# Test results / coverage
+TestResults/
+*.trx
+coverage*.json
+coverage*.xml
+*.coverage
+
+# Local SQLite databases (created at runtime)
+App_Data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local config / secrets
+appsettings.*.local.json
+.env
+*.pem
+
+# IDEs and editors
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+*.swp
+*.DotSettings.user
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json

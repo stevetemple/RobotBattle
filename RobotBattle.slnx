@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RobotBattle.Api/RobotBattle.Api.csproj" />
+    <Project Path="src/RobotBattle.Compiler/RobotBattle.Compiler.csproj" />
+    <Project Path="src/RobotBattle.Engine/RobotBattle.Engine.csproj" />
+    <Project Path="src/RobotBattle.Host/RobotBattle.Host.csproj" />
+    <Project Path="src/RobotBattle.Web/RobotBattle.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RobotBattle.Compiler.Tests/RobotBattle.Compiler.Tests.csproj" />
+    <Project Path="tests/RobotBattle.Engine.Tests/RobotBattle.Engine.Tests.csproj" />
+    <Project Path="tests/RobotBattle.Sandbox.Tests/RobotBattle.Sandbox.Tests.csproj" />
+  </Folder>
+</Solution>
